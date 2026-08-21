@@ -54,7 +54,7 @@ Open [http://localhost:3000](http://localhost:3000).
 1. AgentMail key — [agentmail.to](https://agentmail.to), set `AGENTMAIL_API_KEY`.
 2. Domain (optional) — defaults to `agentmail.to`. To use your own, verify a domain in the AgentMail dashboard and set `AGENTMAIL_DOMAIN`, so bots get `chief@yourdomain.com`.
 3. Model key — `XAI_API_KEY` from [console.x.ai](https://console.x.ai). Grok is the only provider — this is a Grok Bot homage. (`AI_MODEL_ID` overrides the model, default `grok-4.6`.)
-4. Webhook — in AgentMail, create a webhook for the `message.received` event pointing at `https://<your-app>/api/webhook/agentmail`, and put its `whsec_...` secret in `AGENTMAIL_WEBHOOK_SECRET`. For local dev, tunnel with ngrok or similar. Without the secret, the endpoint refuses unsigned events in production — anyone who found the URL could otherwise puppet your bots with forged "emails".
+4. Inbound email — **nothing to do in development.** `pnpm dev` subscribes to AgentMail's WebSocket event stream, so emailing a bot works the moment the server is up: no tunnel, no dashboard, no secret. For a deployed app, register the signed webhook once — `pnpm webhook https://<your-app>` — which creates it via the API and saves `AGENTMAIL_WEBHOOK_SECRET` to `.env.local` (copy it to your host's env). Without the secret the endpoint refuses unsigned events in production; anyone who found the URL could otherwise puppet your bots with forged "emails". (The dev socket is a held-open connection — exactly the standing process this architecture avoids in production, which is why it's dev-only.)
 5. Web search — `EXA_API_KEY` from [exa.ai](https://exa.ai) (free tier available). Strongly recommended: it's what makes bots able to research anything current.
 6. Optional: `PRINCIPAL_EMAIL` so bots can escalate to you by email.
 
@@ -106,8 +106,9 @@ no code, no MCP server, just a docs URL and a key.
 ```
 you (chat)  ---->  POST /api/chat -----------+
                                              v
-a contact (email) -> AgentMail webhook --> which bot owns this inbox?
-                   /api/webhook/agentmail    |
+a contact (email) -> AgentMail event ----> which bot owns this inbox?
+                   (signed webhook in prod;  |
+                    WebSocket in pnpm dev)   |
                                              v
                                       agent loop (AI SDK)
                                       system prompt = bot personality
@@ -124,7 +125,7 @@ a contact (email) -> AgentMail webhook --> which bot owns this inbox?
 - `lib/bots.ts` — the registry. A bot is an AgentMail inbox: `displayName` is the name, metadata holds the tagline and personality (chunked across keys to fit the 256-char metadata value limit), `clientId` makes provisioning idempotent.
 - `lib/agent.ts` — one brain, two entry points: `streamChatTurn` (web chat) and `handleInboundEmail` (webhook).
 - `lib/tools.ts` — the tool surface. Every mail tool operates on the bot's own inbox; there is no shared account anywhere.
-- `app/api/webhook/agentmail/route.ts` — Svix-style signature verification, self-mail loop guard, then hands the email to the owning bot.
+- `lib/inbound.ts` — inbound email → agent turn: owner lookup, self-mail skip, bot-to-bot loop guard. Fed by `app/api/webhook/agentmail/route.ts` (signed webhook, production) and `lib/dev-subscriber.ts` (WebSocket, development).
 - `components/ai-elements/` — chat UI primitives (Conversation, Message, Response, PromptInput, Tool) shaped after the [AI Elements](https://elements.ai-sdk.dev) registry API, on shadcn/ui, Next.js 16, Tailwind v4. `npx ai-elements@latest` can overlay the official versions without touching call sites.
 
 ## Environment variables
@@ -133,7 +134,7 @@ a contact (email) -> AgentMail webhook --> which bot owns this inbox?
 |---|---|---|
 | `AGENTMAIL_API_KEY` | for real mail | Inbox provisioning, send/reply, thread reads |
 | `AGENTMAIL_DOMAIN` | optional | Verified domain for bot addresses (default `agentmail.to`) |
-| `AGENTMAIL_WEBHOOK_SECRET` | production | Verifies inbound webhook signatures |
+| `AGENTMAIL_WEBHOOK_SECRET` | production | Verifies inbound webhook signatures; set by `pnpm webhook <url>`. Dev uses WebSockets instead |
 | `XAI_API_KEY` | yes | Grok, the model behind the bots |
 | `AI_MODEL_ID` | optional | Model override (default `grok-4.6`) |
 | `EXA_API_KEY` | recommended | `web_search` tool |
