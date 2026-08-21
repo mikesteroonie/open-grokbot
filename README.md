@@ -1,8 +1,8 @@
 # serverless-bot
 
-A [Grok Bot](https://x.ai/bot)-style agent workspace with **no computer per bot**. Fully serverless and event-driven: each bot is a real email address, and its inbox is its identity, its memory, and its database.
+A [Grok Bot](https://x.ai/bot)-style agent workspace with **no computer per bot**. Fully serverless and event-driven: each bot is a real email address, and its inbox is its identity, its trigger, and its memory.
 
-Message a bot in the app, or CC it on an email thread. It reads its own inbox, researches on the web, emails third parties from its own address, and escalates to you when something needs your judgment. No VM, no hosted browser, no per-hour compute — a bot at rest is pure data.
+Message a bot in the app, or CC it on an email thread. It reads its own inbox, researches on the web, emails its contacts from its own address, and escalates to you when something needs your judgment. No VM, no hosted browser, no per-hour compute — a bot at rest is pure data.
 
 ![serverless-bot UI](public/screenshot.svg)
 
@@ -106,7 +106,7 @@ no code, no MCP server, just a docs URL and a key.
 ```
 you (chat)  ---->  POST /api/chat -----------+
                                              v
-anyone (email) --> AgentMail webhook --> which bot owns this inbox?
+a contact (email) -> AgentMail webhook --> which bot owns this inbox?
                    /api/webhook/agentmail    |
                                              v
                                       agent loop (AI SDK)
